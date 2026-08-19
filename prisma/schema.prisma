@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdCourses  Course[]          @relation("CourseCreator")
+  enrollments     Enrollment[]
+  progress        StudentProgress[]
+  learningSessions LearningSession[]
+  quizAttempts    QuizAttempt[]
+
+  @@index([clerkId])
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+}
+
+model Course {
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  topic       String
+  difficulty  Difficulty   @default(BEGINNER)
+  status      CourseStatus @default(DRAFT)
+  sourceLinks String[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  creatorId String
+  creator   User   @relation("CourseCreator", fields: [creatorId], references: [id])
+
+  modules     Module[]
+  enrollments Enrollment[]
+  progress    StudentProgress[]
+  learningSessions LearningSession[]
+
+  @@index([creatorId])
+  @@index([topic])
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CourseStatus {
+  DRAFT
+  GENERATING
+  PUBLISHED
+  ARCHIVED
+}
+
+model Module {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courseId String
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  lessons Lesson[]
+  quizzes Quiz[]
+
+  @@unique([courseId, order])
+  @@index([courseId])
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  order       Int
+  sourceLinks String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  completions LessonCompletion[]
+
+  @@unique([moduleId, order])
+  @@index([moduleId])
+}
+
+model Quiz {
+  id        String   @id @default(cuid())
+  title     String
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  questions Question[]
+  attempts  QuizAttempt[]
+
+  @@unique([moduleId, order])
+  @@index([moduleId])
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  type          QuestionType
+  prompt        String
+  options       String[]
+  correctAnswer String
+  explanation   String
+  order         Int
+  createdAt     DateTime     @default(now())
+
+  quizId String
+  quiz   Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, order])
+  @@index([quizId])
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  courseId  String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+}
+
+model StudentProgress {
+  id               String   @id @default(cuid())
+  currentModuleId  String?
+  currentLessonId  String?
+  updatedAt        DateTime @updatedAt
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  courseId  String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  lessonCompletions LessonCompletion[]
+
+  @@unique([userId, courseId])
+  @@index([userId])
+}
+
+model LessonCompletion {
+  id          String   @id @default(cuid())
+  completedAt DateTime @default(now())
+
+  lessonId   String
+  lesson     Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  progressId String
+  progress   StudentProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+
+  @@unique([progressId, lessonId])
+}
+
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  score     Float
+  maxScore  Float
+  answers   Json
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+  quizId String
+  quiz   Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([quizId])
+}
+
+model LearningSession {
+  id             String          @id @default(cuid())
+  topic          String
+  preferences    Json
+  generationMode GenerationMode
+  status         SessionStatus   @default(QUESTIONNAIRE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  userId   String
+  user     User    @relation(fields: [userId], references: [id])
+  courseId String?
+  course   Course? @relation(fields: [courseId], references: [id])
+
+  @@index([userId])
+}
+
+enum GenerationMode {
+  QUIZ
+  LESSON
+  FULL_COURSE
+}
+
+enum SessionStatus {
+  QUESTIONNAIRE
+  GENERATING
+  COMPLETE
+  FAILED
+}
