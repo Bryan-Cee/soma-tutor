@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getQuizWithQuestions } from "@/services/quiz.service";
+import { canUseCourse } from "@/services/course-access.service";
 import Link from "next/link";
 import { QuizPlayer } from "@/components/quiz/quiz-player";
 import { ArrowLeft, CircleHelp } from "lucide-react";
@@ -27,17 +28,21 @@ export default async function QuizPage({ params }: Props) {
     where: { id: quiz.moduleId },
     include: { course: { select: { id: true, title: true } } },
   });
+  if (
+    !courseModule ||
+    !(await canUseCourse(user.id, courseModule.course.id))
+  ) {
+    notFound();
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-      {courseModule && (
-        <Button asChild variant="ghost" className="mb-5 -ml-3 shadow-none">
-          <Link href={`/course/${courseModule.course.id}`}>
-            <ArrowLeft />
-            Back to {courseModule.course.title}
-          </Link>
-        </Button>
-      )}
+      <Button asChild variant="ghost" className="mb-5 -ml-3 shadow-none">
+        <Link href={`/course/${courseModule.course.id}`}>
+          <ArrowLeft />
+          Back to {courseModule.course.title}
+        </Link>
+      </Button>
 
       <Badge variant="secondary" className="mb-3 gap-1.5">
         <CircleHelp className="size-3.5" />

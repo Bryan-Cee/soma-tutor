@@ -51,6 +51,9 @@ export default function HomePage() {
         <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6">
           <Brand />
           <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" className="shadow-none">
+              <Link href="/courses">Browse courses</Link>
+            </Button>
             {isSignedIn ? (
               <Button asChild>
                 <Link href="/dashboard">

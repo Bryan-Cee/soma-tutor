@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
 import {
   BookOpen,
+  Globe2,
   LayoutDashboard,
   PlusCircle,
   Users,
@@ -23,12 +24,14 @@ type NavItem = {
 const studentNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
   { href: "/learn/onboarding", label: "Learn", icon: <BookOpen className="h-4 w-4" /> },
+  { href: "/courses", label: "Explore", icon: <Globe2 className="h-4 w-4" /> },
 ];
 
 const teacherNav: NavItem[] = [
   { href: "/teacher/dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
   { href: "/teacher/create", label: "Create Course", icon: <PlusCircle className="h-4 w-4" /> },
   { href: "/teacher/students", label: "Students", icon: <Users className="h-4 w-4" /> },
+  { href: "/courses", label: "Explore", icon: <Globe2 className="h-4 w-4" /> },
 ];
 
 export function AppNav() {

@@ -98,8 +98,8 @@ export default function OnboardingForm() {
         throw new Error(data.error ?? "Generation failed");
       }
 
-      const { courseId } = await res.json();
-      router.push(`/course/${courseId}`);
+      const { sessionId } = await res.json();
+      router.push(`/learn/generating/${sessionId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);

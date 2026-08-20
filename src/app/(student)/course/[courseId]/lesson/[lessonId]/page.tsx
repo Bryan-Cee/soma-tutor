@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
 import { LessonContent } from "@/components/course/lesson-content";
 import { MarkCompleteButton } from "@/components/course/mark-complete-button";
 import { getAuthUser } from "@/lib/auth";
+import { canUseCourse } from "@/services/course-access.service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,6 +35,7 @@ export default async function LessonPage({ params }: Props) {
   });
 
   if (!lesson || lesson.module.course.id !== courseId) notFound();
+  if (!(await canUseCourse(user.id, courseId))) notFound();
 
   // Find prev/next lesson
   const lessons = lesson.module.lessons;

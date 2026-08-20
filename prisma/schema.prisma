@@ -16,11 +16,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  createdCourses  Course[]          @relation("CourseCreator")
-  enrollments     Enrollment[]
-  progress        StudentProgress[]
+  createdCourses   Course[]          @relation("CourseCreator")
+  enrollments      Enrollment[]
+  progress         StudentProgress[]
   learningSessions LearningSession[]
-  quizAttempts    QuizAttempt[]
+  quizAttempts     QuizAttempt[]
 
   @@index([clerkId])
 }
@@ -31,26 +31,44 @@ enum Role {
 }
 
 model Course {
-  id          String       @id @default(cuid())
+  id          String           @id @default(cuid())
   title       String
   description String
   topic       String
-  difficulty  Difficulty   @default(BEGINNER)
-  status      CourseStatus @default(DRAFT)
+  difficulty  Difficulty       @default(BEGINNER)
+  status      CourseStatus     @default(DRAFT)
+  visibility  CourseVisibility @default(PRIVATE)
   sourceLinks String[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   creatorId String
   creator   User   @relation("CourseCreator", fields: [creatorId], references: [id])
 
-  modules     Module[]
-  enrollments Enrollment[]
-  progress    StudentProgress[]
+  modules          Module[]
+  enrollments      Enrollment[]
+  progress         StudentProgress[]
   learningSessions LearningSession[]
+  shareLink        CourseShareLink?
 
   @@index([creatorId])
   @@index([topic])
+}
+
+enum CourseVisibility {
+  PRIVATE
+  PUBLIC
+}
+
+model CourseShareLink {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  courseId String @unique
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
 
 enum Difficulty {
@@ -63,6 +81,7 @@ enum CourseStatus {
   DRAFT
   GENERATING
   PUBLISHED
+  FAILED
   ARCHIVED
 }
 
@@ -75,7 +94,7 @@ model Module {
   updatedAt   DateTime @updatedAt
 
   courseId String
-  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   lessons Lesson[]
   quizzes Quiz[]
@@ -130,7 +149,7 @@ model Question {
   createdAt     DateTime     @default(now())
 
   quizId String
-  quiz   Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
   @@unique([quizId, order])
   @@index([quizId])
@@ -148,7 +167,7 @@ model Enrollment {
 
   userId   String
   user     User   @relation(fields: [userId], references: [id])
-  courseId  String
+  courseId String
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
@@ -157,14 +176,14 @@ model Enrollment {
 }
 
 model StudentProgress {
-  id               String   @id @default(cuid())
-  currentModuleId  String?
-  currentLessonId  String?
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(cuid())
+  currentModuleId String?
+  currentLessonId String?
+  updatedAt       DateTime @updatedAt
 
   userId   String
   user     User   @relation(fields: [userId], references: [id])
-  courseId  String
+  courseId String
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   lessonCompletions LessonCompletion[]
@@ -178,7 +197,7 @@ model LessonCompletion {
   completedAt DateTime @default(now())
 
   lessonId   String
-  lesson     Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lesson     Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   progressId String
   progress   StudentProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
 
@@ -193,29 +212,57 @@ model QuizAttempt {
   createdAt DateTime @default(now())
 
   userId String
-  user   User @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
   quizId String
-  quiz   Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([quizId])
 }
 
 model LearningSession {
-  id             String          @id @default(cuid())
-  topic          String
-  preferences    Json
-  generationMode GenerationMode
-  status         SessionStatus   @default(QUESTIONNAIRE)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id                 String         @id @default(cuid())
+  topic              String
+  preferences        Json
+  generationPlan     Json?
+  generationMode     GenerationMode
+  status             SessionStatus  @default(QUESTIONNAIRE)
+  generationProgress Int            @default(0)
+  generationMessage  String?
+  errorMessage       String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
-  userId   String
-  user     User    @relation(fields: [userId], references: [id])
-  courseId String?
-  course   Course? @relation(fields: [courseId], references: [id])
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  courseId      String?
+  course        Course?        @relation(fields: [courseId], references: [id])
+  generationJob GenerationJob?
 
   @@index([userId])
+  @@index([courseId])
+}
+
+model GenerationJob {
+  id          String              @id @default(cuid())
+  status      GenerationJobStatus @default(PENDING)
+  attempts    Int                 @default(0)
+  maxAttempts Int                 @default(3)
+  availableAt DateTime            @default(now())
+  lockedAt    DateTime?
+  lockedBy    String?
+  lastError   String?
+  completedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  sessionId String          @unique
+  session   LearningSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([lockedAt])
 }
 
 enum GenerationMode {
@@ -228,5 +275,12 @@ enum SessionStatus {
   QUESTIONNAIRE
   GENERATING
   COMPLETE
+  FAILED
+}
+
+enum GenerationJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
   FAILED
 }

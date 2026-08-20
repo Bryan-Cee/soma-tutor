@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
 import { getCourseProgress } from "@/services/progress.service";
+import { canUseCourse } from "@/services/course-access.service";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -10,7 +11,10 @@ import {
   ChevronRight,
   ExternalLink,
   FileQuestion,
+  Globe2,
+  Users,
 } from "lucide-react";
+import { CourseSharingControls } from "@/components/course/course-sharing-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +38,19 @@ export default async function CourseOverviewPage({ params }: Props) {
   const course = await db.course.findUnique({
     where: { id: courseId },
     include: {
+      learningSessions: {
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { id: true },
+      },
+      shareLink: {
+        where: { isActive: true },
+        select: { token: true },
+      },
+      _count: {
+        select: { enrollments: true },
+      },
       modules: {
         orderBy: { order: "asc" },
         include: {
@@ -45,6 +62,14 @@ export default async function CourseOverviewPage({ params }: Props) {
   });
 
   if (!course) notFound();
+  if (course.status !== "PUBLISHED") {
+    const generationSession = course.learningSessions[0];
+    if (generationSession) {
+      redirect(`/learn/generating/${generationSession.id}`);
+    }
+    notFound();
+  }
+  if (!(await canUseCourse(user.id, courseId))) notFound();
 
   const progress = await getCourseProgress(user.id, courseId);
 
@@ -65,6 +90,17 @@ export default async function CourseOverviewPage({ params }: Props) {
             {course.difficulty.toLowerCase()}
             </Badge>
             <Badge variant="outline">{course.modules.length} modules</Badge>
+            {course.visibility === "PUBLIC" && (
+              <Badge variant="outline">
+                <Globe2 />
+                Public
+              </Badge>
+            )}
+            <Badge variant="outline">
+              <Users />
+              {course._count.enrollments}{" "}
+              {course._count.enrollments === 1 ? "learner" : "learners"}
+            </Badge>
           </div>
           <div>
             <CardTitle className="text-3xl font-bold tracking-[-0.035em] sm:text-4xl">
@@ -88,6 +124,16 @@ export default async function CourseOverviewPage({ params }: Props) {
           </div>
         </CardHeader>
       </Card>
+
+      {course.creatorId === user.id && (
+        <CourseSharingControls
+          courseId={course.id}
+          initialVisibility={course.visibility}
+          initialShareUrl={
+            course.shareLink ? `/share/${course.shareLink.token}` : null
+          }
+        />
+      )}
 
       {course.sourceLinks.length > 0 && (
         <Card className="mt-6" size="sm">

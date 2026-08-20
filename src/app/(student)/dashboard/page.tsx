@@ -5,11 +5,14 @@ import Link from "next/link";
 import {
   ArrowRight,
   BookOpen,
+  CircleAlert,
   Clock3,
   Flame,
   Library,
+  LoaderCircle,
   Sparkles,
   Trophy,
+  Users,
 } from "lucide-react";
 import { PageHeading } from "@/components/layout/page-heading";
 import { Badge } from "@/components/ui/badge";
@@ -72,8 +75,11 @@ export default async function StudentDashboardPage() {
             },
             {
               icon: Flame,
-              value: courses.filter((course) => course.progress.percentage > 0)
-                .length,
+              value: courses.filter(
+                (course) =>
+                  course.status === "PUBLISHED" &&
+                  course.progress.percentage > 0
+              ).length,
               label: "Paths in motion",
               tone: "bg-primary/12 text-primary",
             },
@@ -124,49 +130,113 @@ export default async function StudentDashboardPage() {
             <Badge variant="outline">{courses.length} total</Badge>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <Card
-              key={course.id}
-              className="group transition-all hover:-translate-y-1 hover:shadow-[0_18px_45px_-30px_oklch(0.22_0.026_72/0.55)]"
-            >
-              <CardHeader>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <Badge variant="secondary" className="capitalize">
-                    {course.difficulty.toLowerCase()}
-                  </Badge>
-                  <span className="text-sm font-bold text-primary">
-                    {course.progress.percentage}%
-                  </span>
-                </div>
-                <CardTitle className="line-clamp-2 text-lg transition-colors group-hover:text-primary">
-                  {course.title}
-                </CardTitle>
-                <CardDescription className="line-clamp-2 leading-6">
-                  {course.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="mt-auto space-y-4">
-                <Progress value={course.progress.percentage} className="h-2.5" />
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Trophy className="size-3.5 text-primary" />
-                    {course.progress.completedLessons}/
-                    {course.progress.totalLessons} lessons
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock3 className="size-3.5" />
-                    Continue
-                  </span>
-                </div>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={`/course/${course.id}`}>
-                    Open learning path
-                    <ArrowRight data-icon="inline-end" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+          {courses.map((course) => {
+            const generation = course.learningSessions[0];
+            const isGenerating = course.status === "GENERATING";
+            const isFailed = course.status === "FAILED";
+            const href =
+              isGenerating || isFailed
+                ? generation
+                  ? `/learn/generating/${generation.id}`
+                  : "/learn/onboarding"
+                : `/course/${course.id}`;
+
+            return (
+              <Card
+                key={course.id}
+                className="group transition-all hover:-translate-y-1 hover:shadow-[0_18px_45px_-30px_oklch(0.22_0.026_72/0.55)]"
+              >
+                <CardHeader>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <Badge
+                      variant={
+                        isGenerating
+                          ? "outline"
+                          : isFailed
+                            ? "destructive"
+                            : "secondary"
+                      }
+                      className="capitalize"
+                    >
+                      {isGenerating
+                        ? "Building now"
+                        : isFailed
+                          ? "Needs retry"
+                          : course.difficulty.toLowerCase()}
+                    </Badge>
+                    {isGenerating ? (
+                      <LoaderCircle className="size-5 animate-spin text-primary" />
+                    ) : isFailed ? (
+                      <CircleAlert className="size-5 text-destructive" />
+                    ) : (
+                      <span className="text-sm font-bold text-primary">
+                        {course.progress.percentage}%
+                      </span>
+                    )}
+                  </div>
+                  <CardTitle className="line-clamp-2 text-lg transition-colors group-hover:text-primary">
+                    {course.title}
+                  </CardTitle>
+                  <CardDescription className="line-clamp-2 leading-6">
+                    {course.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="mt-auto space-y-4">
+                  {isGenerating ? (
+                    <>
+                      <Progress
+                        value={generation?.generationProgress ?? 0}
+                        className="h-2.5"
+                      />
+                      <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        {generation?.generationMessage ??
+                          "Preparing your learning path"}
+                      </p>
+                    </>
+                  ) : isFailed ? (
+                    <p className="line-clamp-2 text-sm leading-6 text-destructive">
+                      {generation?.errorMessage ??
+                        "This learning path could not be completed."}
+                    </p>
+                  ) : (
+                    <>
+                      <Progress
+                        value={course.progress.percentage}
+                        className="h-2.5"
+                      />
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Trophy className="size-3.5 text-primary" />
+                          {course.progress.completedLessons}/
+                          {course.progress.totalLessons} lessons
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock3 className="size-3.5" />
+                          Continue
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Users className="size-3.5 text-secondary-foreground" />
+                    {course._count.enrollments}{" "}
+                    {course._count.enrollments === 1 ? "person" : "people"}{" "}
+                    taking this course
+                  </p>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={href}>
+                      {isGenerating
+                        ? "View generation"
+                        : isFailed
+                          ? "View details"
+                          : "Open learning path"}
+                      <ArrowRight data-icon="inline-end" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
           </div>
         </div>
       )}

@@ -2,11 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { learningPreferencesSchema, mapGoalToMode } from "@/types/generation";
-import {
-  createFullCourse,
-  createStandaloneLesson,
-  createStandaloneQuiz,
-} from "@/services/course.service";
 
 export async function POST(req: Request): Promise<NextResponse> {
   const { userId: clerkId } = await auth();
@@ -31,35 +26,60 @@ export async function POST(req: Request): Promise<NextResponse> {
   const prefs = parsed.data;
   const mode = mapGoalToMode(prefs.goal);
 
-  // Create learning session
-  const session = await db.learningSession.create({
-    data: {
-      topic: prefs.topic,
-      preferences: prefs,
-      generationMode: mode,
-      userId: user.id,
-    },
+  const { course, session } = await db.$transaction(async (transaction) => {
+    const pendingCourse = await transaction.course.create({
+      data: {
+        title: prefs.topic,
+        description: "Soma is building this learning path now.",
+        topic: prefs.topic,
+        difficulty:
+          prefs.knowledgeLevel === "beginner"
+            ? "BEGINNER"
+            : prefs.knowledgeLevel === "intermediate"
+              ? "INTERMEDIATE"
+              : "ADVANCED",
+        status: "GENERATING",
+        sourceLinks: [],
+        creatorId: user.id,
+      },
+    });
+
+    const pendingSession = await transaction.learningSession.create({
+      data: {
+        topic: prefs.topic,
+        preferences: prefs,
+        generationMode: mode,
+        status: "GENERATING",
+        generationProgress: 0,
+        generationMessage: "Waiting for the generation worker",
+        userId: user.id,
+        courseId: pendingCourse.id,
+      },
+    });
+
+    await transaction.enrollment.create({
+      data: {
+        userId: user.id,
+        courseId: pendingCourse.id,
+      },
+    });
+    await transaction.studentProgress.create({
+      data: {
+        userId: user.id,
+        courseId: pendingCourse.id,
+      },
+    });
+    await transaction.generationJob.create({
+      data: {
+        sessionId: pendingSession.id,
+      },
+    });
+
+    return { course: pendingCourse, session: pendingSession };
   });
 
-  try {
-    let courseId: string;
-
-    switch (mode) {
-      case "FULL_COURSE":
-        courseId = await createFullCourse(user.id, session.id, prefs);
-        break;
-      case "LESSON":
-        courseId = await createStandaloneLesson(user.id, session.id, prefs);
-        break;
-      case "QUIZ":
-        courseId = await createStandaloneQuiz(user.id, session.id, prefs);
-        break;
-    }
-
-    return NextResponse.json({ courseId, sessionId: session.id });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Generation failed";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+  return NextResponse.json(
+    { courseId: course.id, sessionId: session.id },
+    { status: 202 }
+  );
 }

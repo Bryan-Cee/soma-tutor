@@ -5,7 +5,9 @@ import Link from "next/link";
 import {
   ArrowRight,
   BookOpen,
+  CircleAlert,
   FileStack,
+  LoaderCircle,
   PlusCircle,
   Sparkles,
   Users,
@@ -32,7 +34,13 @@ export default async function TeacherDashboardPage() {
     where: { creatorId: user.id },
     include: {
       modules: { select: { id: true } },
-      enrollments: { select: { id: true } },
+      _count: { select: { enrollments: true } },
+      learningSessions: {
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { id: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -82,41 +90,78 @@ export default async function TeacherDashboardPage() {
             <Badge variant="outline">{courses.length} total</Badge>
           </div>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <Card key={course.id}>
-              <CardHeader>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <Badge
-                    variant={
-                      course.status === "PUBLISHED" ? "secondary" : "outline"
-                    }
-                    className="capitalize"
-                  >
-                  {course.status.toLowerCase()}
-                  </Badge>
-                  <FileStack className="size-5 text-primary" />
-                </div>
-                <CardTitle className="line-clamp-2 text-lg">
-                  {course.title}
-                </CardTitle>
-                <CardDescription className="line-clamp-2 leading-6">
-                  {course.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="mt-auto">
-                <div className="flex items-center gap-5 rounded-xl bg-muted/60 p-3 text-sm">
-                  <span className="inline-flex items-center gap-1.5">
-                    <BookOpen className="size-4 text-primary" />
-                    {course.modules.length} modules
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Users className="size-4 text-secondary-foreground" />
-                    {course.enrollments.length} students
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {courses.map((course) => {
+            const generation = course.learningSessions[0];
+            const isGenerating = course.status === "GENERATING";
+            const isFailed = course.status === "FAILED";
+            const href =
+              isGenerating || isFailed
+                ? generation
+                  ? `/learn/generating/${generation.id}`
+                  : "/teacher/create"
+                : `/course/${course.id}`;
+
+            return (
+              <Card key={course.id}>
+                <CardHeader>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <Badge
+                      variant={
+                        course.status === "PUBLISHED"
+                          ? "secondary"
+                          : isFailed
+                            ? "destructive"
+                            : "outline"
+                      }
+                      className="capitalize"
+                    >
+                      {isGenerating
+                        ? "building now"
+                        : course.status.toLowerCase()}
+                    </Badge>
+                    {isGenerating ? (
+                      <LoaderCircle className="size-5 animate-spin text-primary" />
+                    ) : isFailed ? (
+                      <CircleAlert className="size-5 text-destructive" />
+                    ) : (
+                      <FileStack className="size-5 text-primary" />
+                    )}
+                  </div>
+                  <CardTitle className="line-clamp-2 text-lg">
+                    {course.title}
+                  </CardTitle>
+                  <CardDescription className="line-clamp-2 leading-6">
+                    {course.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="mt-auto space-y-4">
+                  <div className="flex items-center gap-5 rounded-xl bg-muted/60 p-3 text-sm">
+                    <span className="inline-flex items-center gap-1.5">
+                      <BookOpen className="size-4 text-primary" />
+                      {course.modules.length} modules
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Users className="size-4 text-secondary-foreground" />
+                      {course._count.enrollments}{" "}
+                      {course._count.enrollments === 1
+                        ? "learner"
+                        : "learners"}
+                    </span>
+                  </div>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={href}>
+                      {isGenerating
+                        ? "View generation"
+                        : isFailed
+                          ? "View details"
+                          : "Open course"}
+                      <ArrowRight data-icon="inline-end" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
           </div>
         </div>
       )}

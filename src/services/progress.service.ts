@@ -64,6 +64,23 @@ export async function getStudentDashboard(userId: string) {
     include: {
       course: {
         include: {
+          learningSessions: {
+            where: { userId },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              id: true,
+              status: true,
+              generationProgress: true,
+              generationMessage: true,
+              errorMessage: true,
+            },
+          },
+          _count: {
+            select: {
+              enrollments: true,
+            },
+          },
           modules: {
             orderBy: { order: "asc" },
             include: {

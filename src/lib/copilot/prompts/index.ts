@@ -10,8 +10,8 @@ LEARNING STYLE: ${prefs.learningStyle}
 TIME BUDGET: ${prefs.timeBudget}
 
 Requirements:
-- Structure the course into logical modules (3-8 modules depending on scope)
-- Each module should have 2-5 lessons
+- Structure the course into 3-5 logical modules
+- Each module should have 2-4 lessons
 - Each module ends with a quiz
 - Adapt depth and vocabulary to the student's level
 - Include real-world examples for the "${prefs.learningStyle}" learning style
@@ -55,6 +55,7 @@ Requirements:
 - Include practical examples and code snippets where relevant
 - For "${prefs.learningStyle}" learners: ${getLearningStyleGuidance(prefs.learningStyle)}
 - Adapt vocabulary and depth to ${prefs.knowledgeLevel} level
+- Keep the lesson focused at approximately 700-1,000 words
 - End with a brief summary of key takeaways
 - Include source references as markdown links
 

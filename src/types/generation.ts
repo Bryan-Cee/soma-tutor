@@ -49,40 +49,49 @@ export function mapGoalToMode(goal: LearningPreferences["goal"]): GenerationMode
   }
 }
 
-export type CourseOutline = {
-  title: string;
-  description: string;
-  modules: ModuleOutline[];
-  sourceLinks: string[];
-};
+const sourceLinksSchema = z.array(z.url()).max(20);
 
-export type ModuleOutline = {
-  title: string;
-  description: string;
-  lessons: LessonOutline[];
-  quizTitle: string;
-};
+export const lessonOutlineSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+});
 
-export type LessonOutline = {
-  title: string;
-  description: string;
-};
+export const moduleOutlineSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  lessons: z.array(lessonOutlineSchema).min(1).max(5),
+  quizTitle: z.string().min(1),
+});
 
-export type GeneratedLesson = {
-  title: string;
-  content: string;
-  sourceLinks: string[];
-};
+export const courseOutlineSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  modules: z.array(moduleOutlineSchema).min(1).max(6),
+  sourceLinks: sourceLinksSchema,
+});
 
-export type GeneratedQuiz = {
-  title: string;
-  questions: GeneratedQuestion[];
-};
+export const generatedLessonSchema = z.object({
+  title: z.string().min(1),
+  content: z.string().min(1),
+  sourceLinks: sourceLinksSchema,
+});
 
-export type GeneratedQuestion = {
-  type: "MULTIPLE_CHOICE" | "TRUE_FALSE" | "SHORT_ANSWER";
-  prompt: string;
-  options: string[];
-  correctAnswer: string;
-  explanation: string;
-};
+export const generatedQuestionSchema = z.object({
+  type: z.enum(["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"]),
+  prompt: z.string().min(1),
+  options: z.array(z.string().min(1)).max(8),
+  correctAnswer: z.string().min(1),
+  explanation: z.string().min(1),
+});
+
+export const generatedQuizSchema = z.object({
+  title: z.string().min(1),
+  questions: z.array(generatedQuestionSchema).min(1).max(20),
+});
+
+export type CourseOutline = z.infer<typeof courseOutlineSchema>;
+export type ModuleOutline = z.infer<typeof moduleOutlineSchema>;
+export type LessonOutline = z.infer<typeof lessonOutlineSchema>;
+export type GeneratedLesson = z.infer<typeof generatedLessonSchema>;
+export type GeneratedQuiz = z.infer<typeof generatedQuizSchema>;
+export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
