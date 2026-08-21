@@ -28,12 +28,11 @@ function wait(milliseconds: number): Promise<void> {
 }
 
 async function runJob(
-  job: ClaimedGenerationJob,
-  workerId: string
+  job: ClaimedGenerationJob
 ): Promise<void> {
   let leaseLost = false;
   const leaseTimer = setInterval(() => {
-    void renewGenerationJobLease(job.id, workerId)
+    void renewGenerationJobLease(job.id, job.leaseToken)
       .then((renewed) => {
         if (!renewed) leaseLost = true;
       })
@@ -47,7 +46,7 @@ async function runJob(
     writeMessage(
       `processing job ${job.id}, attempt ${job.attempts}/${job.maxAttempts}`
     );
-    const result = await processGenerationJob(job, workerId);
+    const result = await processGenerationJob(job);
     if (leaseLost) {
       writeMessage(`job ${job.id} ${result} after its lease was lost`);
     } else {
@@ -79,14 +78,14 @@ async function main(): Promise<void> {
         lastRecoveryAt = now;
       }
 
-      const job = await claimGenerationJob(workerId);
+      const job = await claimGenerationJob();
       if (!job) {
         await wait(POLL_INTERVAL_MS);
         continue;
       }
 
       try {
-        await runJob(job, workerId);
+        await runJob(job);
       } catch (error) {
         writeError(error);
         await wait(POLL_INTERVAL_MS);

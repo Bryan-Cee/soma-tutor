@@ -10,7 +10,23 @@ type Props = {
 export function LessonContent({ content }: Props) {
   return (
     <div className="prose prose-blue max-w-none">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ children, href, title }) => (
+            <a
+              href={href}
+              title={title}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

@@ -11,6 +11,7 @@ export type ClaimedGenerationJob = {
   sessionId: string;
   attempts: number;
   maxAttempts: number;
+  leaseToken: string;
 };
 
 export type GenerationJobResult = "completed" | "retrying" | "failed";
@@ -30,9 +31,7 @@ function getRetryDelay(attempts: number): number {
   ];
 }
 
-export async function claimGenerationJob(
-  workerId: string
-): Promise<ClaimedGenerationJob | null> {
+export async function claimGenerationJob(): Promise<ClaimedGenerationJob | null> {
   const jobs = await db.$queryRaw<ClaimedGenerationJob[]>`
     WITH candidate AS (
       SELECT "id"
@@ -49,7 +48,7 @@ export async function claimGenerationJob(
       "status" = 'RUNNING',
       "attempts" = job."attempts" + 1,
       "lockedAt" = NOW(),
-      "lockedBy" = ${workerId},
+      "lockedBy" = gen_random_uuid()::text,
       "updatedAt" = NOW()
     FROM candidate
     WHERE job."id" = candidate."id"
@@ -57,7 +56,8 @@ export async function claimGenerationJob(
       job."id",
       job."sessionId",
       job."attempts",
-      job."maxAttempts"
+      job."maxAttempts",
+      job."lockedBy" AS "leaseToken"
   `;
 
   return jobs[0] ?? null;
@@ -65,13 +65,13 @@ export async function claimGenerationJob(
 
 export async function renewGenerationJobLease(
   jobId: string,
-  workerId: string
+  leaseToken: string
 ): Promise<boolean> {
   const result = await db.generationJob.updateMany({
     where: {
       id: jobId,
       status: "RUNNING",
-      lockedBy: workerId,
+      lockedBy: leaseToken,
     },
     data: {
       lockedAt: new Date(),
@@ -172,14 +172,13 @@ export async function recoverExpiredGenerationJobs(): Promise<void> {
 }
 
 async function completeGenerationJob(
-  job: ClaimedGenerationJob,
-  workerId: string
+  job: ClaimedGenerationJob
 ): Promise<void> {
   const result = await db.generationJob.updateMany({
     where: {
       id: job.id,
       status: "RUNNING",
-      lockedBy: workerId,
+      lockedBy: job.leaseToken,
     },
     data: {
       status: "COMPLETED",
@@ -197,7 +196,6 @@ async function completeGenerationJob(
 
 async function retryGenerationJob(
   job: ClaimedGenerationJob,
-  workerId: string,
   error: unknown
 ): Promise<void> {
   const availableAt = new Date(Date.now() + getRetryDelay(job.attempts));
@@ -208,7 +206,7 @@ async function retryGenerationJob(
       where: {
         id: job.id,
         status: "RUNNING",
-        lockedBy: workerId,
+        lockedBy: job.leaseToken,
       },
       data: {
         status: "PENDING",
@@ -235,7 +233,6 @@ async function retryGenerationJob(
 
 async function failGenerationJob(
   job: ClaimedGenerationJob,
-  workerId: string,
   error: unknown
 ): Promise<void> {
   await db.$transaction(async (transaction) => {
@@ -243,7 +240,7 @@ async function failGenerationJob(
       where: {
         id: job.id,
         status: "RUNNING",
-        lockedBy: workerId,
+        lockedBy: job.leaseToken,
       },
       data: {
         status: "FAILED",
@@ -278,20 +275,19 @@ async function failGenerationJob(
 }
 
 export async function processGenerationJob(
-  job: ClaimedGenerationJob,
-  workerId: string
+  job: ClaimedGenerationJob
 ): Promise<GenerationJobResult> {
   try {
     await generateCourseForSession(job.sessionId);
-    await completeGenerationJob(job, workerId);
+    await completeGenerationJob(job);
     return "completed";
   } catch (error) {
     if (job.attempts < job.maxAttempts) {
-      await retryGenerationJob(job, workerId, error);
+      await retryGenerationJob(job, error);
       return "retrying";
     }
 
-    await failGenerationJob(job, workerId, error);
+    await failGenerationJob(job, error);
     return "failed";
   }
 }

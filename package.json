@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:all": "npm run db:start && concurrently --kill-others --names app,worker \"next dev\" \"npm run worker:dev\"",
+    "dev:lan": "npm run db:start && npm run cert:lan && concurrently --kill-others --names app,worker \"next dev --hostname 0.0.0.0 --experimental-https --experimental-https-key .certificates/soma-local-key.pem --experimental-https-cert .certificates/soma-local.pem\" \"npm run worker:dev\"",
+    "cert:lan": "node scripts/ensure-lan-certificate.mjs",
     "db:start": "prisma dev --detach",
     "build": "next build",
     "start": "next start",
